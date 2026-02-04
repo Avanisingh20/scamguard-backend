@@ -95,3 +95,7 @@ def process_text(text: str):
 @app.post("/analyze", response_model=HoneypotResponse)
 def analyze_message(data: InputMessage):
     return process_text(data.input_message)
+
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to ScamGuard AI Intelligence API"} 
