@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ScamGuard AI</title>
+  <style>
+    body { font-family: Arial; padding: 40px; max-width: 700px; margin: auto; }
+    textarea { width: 100%; height: 120px; font-size: 16px; padding: 10px; }
+    button { padding: 10px 20px; margin-top: 10px; cursor: pointer; }
+    .result { margin-top: 20px; padding: 10px; border-radius: 5px; }
+    .scam { color: red; font-weight: bold; }
+    .safe { color: green; font-weight: bold; }
+    .entities { margin-top: 10px; background: #f0f0f0; padding: 10px; border-radius: 5px; }
+    h2 { margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+
+<h2>ScamGuard AI</h2>
+
+<textarea id="msg" placeholder="Paste message here"></textarea><br>
+<button onclick="check()">Analyze</button>
+
+<div id="result" class="result"></div>
+<div id="entities" class="entities"></div>
+
+<script>
+async function check() {
+  const text = document.getElementById("msg").value;
+
+  const res = await fetch("https://scamguard-backend-1.onrender.com/analyze-message", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({input_message: text})
+  });
+
+  const data = await res.json();
+
+  // Show confidence and scam type
+  const resultDiv = document.getElementById("result");
+  if(data.scam_detected){
+    resultDiv.innerHTML = `⚠️ Scam Detected!<br>Type: ${data.scam_type}<br>Confidence: <span class="scam">${data.confidence}%</span>`;
+  } else {
+    resultDiv.innerHTML = `✅ Safe message<br>Confidence: <span class="safe">${data.confidence}%</span>`;
+  }
+
+  // Show extracted entities
+  const entitiesDiv = document.getElementById("entities");
+  entitiesDiv.innerHTML = `
+    <b>UPI IDs:</b> ${data.extracted_entities.upi_ids.join(", ") || "None"}<br>
+    <b>Links:</b> ${data.extracted_entities.phishing_links.join(", ") || "None"}<br>
+    <b>OTPs:</b> ${data.extracted_entities.otps.join(", ") || "None"}
+  `;
+}
+</script>
+
+</body>
+</html>
