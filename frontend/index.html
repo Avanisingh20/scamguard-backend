@@ -1,116 +1,96 @@
-\<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>ScamGuard AI</title>
 
 <style>
-  * {
-    box-sizing: border-box;
-    font-family: "Segoe UI", Arial, sans-serif;
-  }
+* {
+  box-sizing: border-box;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
 
-  body {
-    margin: 0;
-    min-height: 100vh;
-    background: linear-gradient(135deg, #1e1e2f, #2c2c54);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: white;
-  }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1e1e2f, #2c2c54);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+}
 
-  .container {
-    background: #111827;
-    padding: 30px;
-    border-radius: 14px;
-    width: 90%;
-    max-width: 650px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  }
+.container {
+  background: #111827;
+  padding: 30px;
+  border-radius: 14px;
+  width: 90%;
+  max-width: 650px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
 
-  h1 {
-    text-align: center;
-    margin-bottom: 20px;
-    color: #60a5fa;
-  }
+h1 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #60a5fa;
+}
 
-  textarea {
-    width: 100%;
-    height: 130px;
-    padding: 12px;
-    border-radius: 8px;
-    border: none;
-    resize: none;
-    font-size: 15px;
-    margin-bottom: 15px;
-  }
+textarea {
+  width: 100%;
+  height: 130px;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  resize: none;
+  font-size: 15px;
+  margin-bottom: 15px;
+}
 
-  button {
-    width: 100%;
-    padding: 12px;
-    border: none;
-    border-radius: 8px;
-    background: #3b82f6;
-    color: white;
-    font-size: 16px;
-    cursor: pointer;
-    transition: 0.3s;
-  }
+button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: #3b82f6;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  transition: 0.3s;
+}
 
-  button:hover {
-    background: #2563eb;
-  }
+button:hover {
+  background: #2563eb;
+}
 
-  .result, .entities, .error, .loading {
-    margin-top: 15px;
-    padding: 12px;
-    border-radius: 8px;
-  }
+.result, .entities, .error, .loading {
+  margin-top: 15px;
+  padding: 12px;
+  border-radius: 8px;
+}
 
-  .result {
-    background: #1f2937;
-  }
+.result { background: #1f2937; }
+.entities { background: #0f172a; font-size: 14px; }
+.error { background: #7c2d12; color: #fca5a5; }
+.loading { background: #1e3a8a; }
 
-  .entities {
-    background: #0f172a;
-    font-size: 14px;
-  }
-
-  .error {
-    background: #7c2d12;
-    color: #fca5a5;
-  }
-
-  .loading {
-    background: #1e3a8a;
-  }
-
-  .scam {
-    color: #f87171;
-    font-weight: bold;
-  }
-
-  .safe {
-    color: #4ade80;
-    font-weight: bold;
-  }
+.scam { color: #f87171; font-weight: bold; }
+.safe { color: #4ade80; font-weight: bold; }
 </style>
 </head>
 
 <body>
 
 <div class="container">
-  <h1>🛡 ScamGuard AI</h1>
+<h1>🛡 ScamGuard AI</h1>
 
-  <textarea id="msg" placeholder="Paste suspicious message here..."></textarea>
+<textarea id="msg" placeholder="Paste suspicious message here..."></textarea>
 
-  <button onclick="check()">Analyze Message</button>
+<button onclick="check()">Analyze Message</button>
 
-  <div id="loading" class="loading" style="display:none;">Analyzing...</div>
-  <div id="result" class="result"></div>
-  <div id="entities" class="entities"></div>
-  <div id="error" class="error"></div>
+<div id="loading" class="loading" style="display:none;">Analyzing...</div>
+<div id="result" class="result"></div>
+<div id="entities" class="entities"></div>
+<div id="error" class="error"></div>
 </div>
 
 <script>
@@ -139,29 +119,45 @@ async function check() {
       body: JSON.stringify({ input_message: text })
     });
 
+    if (!res.ok) throw new Error("Network error");
+
     const data = await res.json();
     loadingDiv.style.display = "none";
 
-    if (data.scam_detected) {
+    // SAFE CONFIDENCE
+    const confidence =
+      data.confidence ??
+      data.score ??
+      data.risk_score ??
+      0;
+
+    // SAFE ENTITIES
+    const entities = data.extracted_entities || {};
+    const upis = entities.upi_ids || [];
+    const links = entities.phishing_links || [];
+    const otps = entities.otps || [];
+
+    if (data.scam_detected === true) {
       resultDiv.innerHTML =
         `⚠️ <span class="scam">Scam Detected</span><br>
-         Type: ${data.scam_type}<br>
-         Confidence: ${data.confidence}%`;
+         Type: ${data.scam_type || "Unknown"}<br>
+         Confidence: ${confidence}%`;
     } else {
       resultDiv.innerHTML =
         `✅ <span class="safe">Safe Message</span><br>
-         Confidence: ${data.confidence}%`;
+         Confidence: ${confidence}%`;
     }
 
     entitiesDiv.innerHTML = `
-      <b>UPI IDs:</b> ${data.extracted_entities.upi_ids.join(", ") || "None"}<br>
-      <b>Links:</b> ${data.extracted_entities.phishing_links.join(", ") || "None"}<br>
-      <b>OTPs:</b> ${data.extracted_entities.otps.join(", ") || "None"}
+      <b>UPI IDs:</b> ${upis.join(", ") || "None"}<br>
+      <b>Links:</b> ${links.join(", ") || "None"}<br>
+      <b>OTPs:</b> ${otps.join(", ") || "None"}
     `;
 
   } catch (err) {
     loadingDiv.style.display = "none";
-    errorDiv.innerText = "Backend sleeping or network issue. Try again in 30 seconds.";
+    errorDiv.innerText =
+      "Backend waking up or network issue. Wait 20–30 seconds and try again.";
   }
 }
 </script>
