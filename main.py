@@ -1,4 +1,3 @@
-# main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from schemas import InputMessage, HoneypotResponse
@@ -6,59 +5,50 @@ import re
 
 app = FastAPI(title="ScamGuard AI Intelligence")
 
-# ---------- CORS ----------
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins, change in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---------- CORE LOGIC ----------
-def process_text(text: str):
-    # Clean and normalize text
-    text_clean = text.replace('\n', ' ').replace('\r', ' ')
-    text_lower = text_clean.lower()
+def analyze_text(text: str):
+    text_clean = text.replace('\n', ' ').replace('\r', ' ').lower()
 
-    # Regex patterns
     patterns = {
         "otp": r"\b\d{4,8}\b",
         "upi": r"\b[\w\.-]+@[\w]+\b",
-        "url": r"(https?://[^\s]+)",
+        "url": r"https?://[^\s]+",
         "phone": r"\b[6-9]\d{9}\b"
     }
 
-    # Extract entities
     found = {k: re.findall(v, text_clean) for k, v in patterns.items()}
 
-    # Initialize risk factors
     confidence = 0
     factors = []
     tactics = []
 
-    # Check for authority impersonation
-    authority_keywords = ["rbi","sbi","bank","kyc","police","income tax","aadhaar","pan"]
-    if any(word in text_lower for word in authority_keywords):
+    # Authority keywords
+    if any(word in text_clean for word in ["rbi","sbi","bank","kyc","police","income tax","aadhaar","pan"]):
         confidence += 25
         factors.append("Authority Impersonation")
         tactics.append("Authority Abuse")
 
-    # Check for urgency/fear
-    urgency_keywords = ["urgent","blocked","immediately","deadline","penalty"]
-    if any(word in text_lower for word in urgency_keywords):
+    # Urgency keywords
+    if any(word in text_clean for word in ["urgent","blocked","immediately","deadline","penalty"]):
         confidence += 25
         factors.append("Urgency/Fear")
         tactics.append("Fear")
 
-    # Check for reward lure
-    reward_keywords = ["lottery","won","reward","gift","bonus","prize"]
-    if any(word in text_lower for word in reward_keywords):
+    # Reward keywords
+    if any(word in text_clean for word in ["lottery","won","reward","gift","bonus","prize"]):
         confidence += 25
         factors.append("Reward Lure")
         tactics.append("Greed")
 
-    # Add confidence for detected entities
+    # Detected entities
     if found["otp"]:
         confidence += 35
         factors.append("OTP Detected")
@@ -69,26 +59,24 @@ def process_text(text: str):
         confidence += 20
         factors.append("Phishing Link")
 
-    # Cap confidence at 100
     confidence = min(confidence, 100)
 
-    # Determine risk level
     if confidence >= 80:
-        risk_level = "CRITICAL"
-        reply = "⚠️ HIGH SCAM RISK"
+        risk = "CRITICAL"
+        reply = "HIGH SCAM RISK"
     elif confidence >= 50:
-        risk_level = "HIGH"
-        reply = "🚩 Likely Scam"
+        risk = "HIGH"
+        reply = "Likely Scam"
     elif confidence >= 30:
-        risk_level = "MEDIUM"
+        risk = "MEDIUM"
         reply = "Be Careful"
     else:
-        risk_level = "LOW"
+        risk = "LOW"
         reply = "Looks Safe"
 
     return {
         "scam_detected": confidence >= 40,
-        "risk_level": risk_level,
+        "risk_level": risk,
         "confidence": float(confidence),
         "tactics": list(set(tactics)),
         "confidence_factors": factors,
@@ -100,17 +88,11 @@ def process_text(text: str):
         }
     }
 
-# ---------- ENDPOINTS ----------
-
-# Main endpoint
-@app.post("/analyze", response_model=HoneypotResponse)
+# Main endpoint (accepts trailing slash too)
+@app.post("/analyze")
+@app.post("/analyze/")
 def analyze_message(data: InputMessage):
-    return process_text(data.input_message)
-
-# Alias endpoint so frontend also works
-@app.post("/analyze-message", response_model=HoneypotResponse)
-def analyze_message_alias(data: InputMessage):
-    return process_text(data.input_message)
+    return analyze_text(data.input_message)
 
 # Health check
 @app.get("/")
