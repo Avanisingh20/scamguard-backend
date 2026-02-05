@@ -1,11 +1,12 @@
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from schemas import InputMessage, HoneypotResponse
 import re
 
-app = FastAPI(title="ScamGuard AI Intelligence")
+app = FastAPI(title="ScamGuard AI")
 
-# Allow frontend to talk to backend
+API_KEY = "scamguard123"
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,7 +15,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# -------- CORE LOGIC --------
 def process_text(text: str):
     text_clean = text.replace('\n', ' ').replace('\r', ' ')
     text_lower = text_clean.lower()
@@ -41,41 +41,35 @@ def process_text(text: str):
     urgency_keywords = ["urgent","blocked","immediately","deadline","penalty"]
     if any(word in text_lower for word in urgency_keywords):
         confidence += 25
-        factors.append("Urgency/Fear")
-        tactics.append("Fear")
+        factors.append("Urgency")
 
-    reward_keywords = ["lottery","won","reward","gift","bonus"]
+    reward_keywords = ["lottery","won","reward","gift","bonus","prize"]
     if any(word in text_lower for word in reward_keywords):
         confidence += 25
         factors.append("Reward Lure")
-        tactics.append("Greed")
 
     if found["otp"]:
         confidence += 35
-        factors.append("OTP Detected")
+        factors.append("OTP Found")
 
     if found["upi"]:
         confidence += 15
-        factors.append("UPI Detected")
+        factors.append("UPI Found")
 
     if found["url"]:
         confidence += 20
-        factors.append("Phishing Link")
+        factors.append("Link Found")
 
     confidence = min(confidence, 100)
 
     if confidence >= 80:
         risk_level = "CRITICAL"
-        reply = "⚠️ HIGH SCAM RISK"
     elif confidence >= 50:
         risk_level = "HIGH"
-        reply = "🚩 Likely Scam"
     elif confidence >= 30:
         risk_level = "MEDIUM"
-        reply = "Be Careful"
     else:
         risk_level = "LOW"
-        reply = "Looks Safe"
 
     return {
         "scam_detected": confidence >= 40,
@@ -83,7 +77,6 @@ def process_text(text: str):
         "confidence": float(confidence),
         "tactics": list(set(tactics)),
         "confidence_factors": factors,
-        "agent_reply": reply,
         "extracted_entities": {
             "upi_ids": found["upi"],
             "phishing_links": found["url"],
@@ -91,11 +84,18 @@ def process_text(text: str):
         }
     }
 
-# -------- ENDPOINT --------
 @app.post("/analyze", response_model=HoneypotResponse)
-def analyze_message(data: InputMessage):
+def analyze_message(data: InputMessage, x_api_key: str = Header(...)):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API Key")
+    return process_text(data.input_message)
+
+@app.post("/analyze-message", response_model=HoneypotResponse)
+def analyze_message_alias(data: InputMessage, x_api_key: str = Header(...)):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API Key")
     return process_text(data.input_message)
 
 @app.get("/")
 def root():
-    return {"message": "API is running"}
+    return {"status": "running"}

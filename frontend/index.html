@@ -113,7 +113,8 @@ async function check() {
   loadingDiv.style.display = "block";
 
   try {
-    const res = await fetch("https://scamguard-backend-1.onrender.com/analyze-message", {
+    // ✅ FIXED ENDPOINT HERE
+    const res = await fetch("https://scamguard-backend-1.onrender.com/analyze", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({ input_message: text })
@@ -124,14 +125,8 @@ async function check() {
     const data = await res.json();
     loadingDiv.style.display = "none";
 
-    // SAFE CONFIDENCE
-    const confidence =
-      data.confidence ??
-      data.score ??
-      data.risk_score ??
-      0;
+    const confidence = data.confidence ?? 0;
 
-    // SAFE ENTITIES
     const entities = data.extracted_entities || {};
     const upis = entities.upi_ids || [];
     const links = entities.phishing_links || [];
@@ -140,7 +135,7 @@ async function check() {
     if (data.scam_detected === true) {
       resultDiv.innerHTML =
         `⚠️ <span class="scam">Scam Detected</span><br>
-         Type: ${data.scam_type || "Unknown"}<br>
+         Risk Level: ${data.risk_level || "Unknown"}<br>
          Confidence: ${confidence}%`;
     } else {
       resultDiv.innerHTML =
@@ -157,7 +152,7 @@ async function check() {
   } catch (err) {
     loadingDiv.style.display = "none";
     errorDiv.innerText =
-      "Backend waking up or network issue. Wait 20–30 seconds and try again.";
+      "Backend waking up… wait 20–30 seconds then click Analyze again.";
   }
 }
 </script>
